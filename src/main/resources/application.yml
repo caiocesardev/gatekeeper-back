@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://json.schemastore.org/spring-boot-application.json
+
+spring:
+  application:
+    name: gatekeeper-backend
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/gatekeeper_db
+    username: admin
+    password: adminpassword
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  mqtt:
+    broker-url: tcp://localhost:1883
+    client-id: spring-boot-backend
+
+app:
+  jwt:
+    secret: GatekeeperBackJwtSecretKey_ChangeInProduction_32CharsMin
+    expiration-ms: 86400000
