@@ -1,23 +1,23 @@
 package com.webcrafters.gatekeeperback.messaging.subscriber
 
+import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.webcrafters.gatekeeperback.domain.model.AccessLog
 import com.webcrafters.gatekeeperback.domain.repository.AccessLogRepository
 import com.webcrafters.gatekeeperback.domain.repository.AccessPointRepository
+import jakarta.annotation.PostConstruct
 import org.eclipse.paho.client.mqttv3.IMqttClient
 import org.eclipse.paho.client.mqttv3.IMqttMessageListener
-import org.springframework.beans.factory.annotation.Value
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime
-import jakarta.annotation.PostConstruct
-import org.slf4j.LoggerFactory
 
 @Component
 class AccessEventSubscriber(
     private val mqttClient: IMqttClient,
     private val accessLogRepository: AccessLogRepository,
     private val accessPointRepository: AccessPointRepository,
-    @Value("\${spring.mqtt.broker-url:tcp://localhost:1883}")
-    private val brokerUrl: String,
+    private val objectMapper: ObjectMapper,
 ) {
     private val logger = LoggerFactory.getLogger(AccessEventSubscriber::class.java)
 
@@ -35,41 +35,33 @@ class AccessEventSubscriber(
 
     private fun handleAccessEvent(topic: String, payload: String) {
         try {
-            // Formato esperado: gatekeeper/access/{mqttIdentifier}
-            // Payload: {"tagRead":"ABC123","isGranted":true,"denialReason":null}
-            val parts = topic.split("/")
-            if (parts.size < 3) return
-
-            val mqttIdentifier = parts[2]
-            val accessPoint = accessPointRepository.findAll()
-                .find { it.mqttIdentifier == mqttIdentifier && it.deletedAt == null }
+            val mqttIdentifier = topic.substringAfter("gatekeeper/access/")
+            val accessPoint = accessPointRepository.findByMqttIdentifier(mqttIdentifier)
                 ?: run {
                     logger.warn("Ponto de acesso não encontrado: $mqttIdentifier")
                     return
                 }
 
-            // Parse JSON simples (idealmente usar Jackson)
-            val tagRead = payload.substringAfter("\"tagRead\":\"").substringBefore("\"")
-            val isGranted = payload.contains("\"isGranted\":true")
-            val denialReason = if (payload.contains("\"denialReason\":null")) {
-                null
-            } else {
-                payload.substringAfter("\"denialReason\":\"").substringBefore("\"")
-            }
+            val event = objectMapper.readValue(payload, AccessEventPayload::class.java)
 
             val accessLog = AccessLog(
-                tagRead = tagRead,
+                tagRead = event.tagRead,
                 accessPoint = accessPoint,
                 timestamp = LocalDateTime.now(),
-                isGranted = isGranted,
-                denialReason = denialReason,
+                isGranted = event.isGranted,
+                denialReason = event.denialReason,
             )
             accessLogRepository.save(accessLog)
 
-            logger.info("📝 AccessLog criado: tag=$tagRead, ponto=$mqttIdentifier, concedido=$isGranted")
+            logger.info("📝 AccessLog criado: tag=${event.tagRead}, ponto=$mqttIdentifier, concedido=${event.isGranted}")
         } catch (e: Exception) {
-            logger.error("❌ Erro ao processar evento de acesso", e)
+            logger.error("❌ Erro ao processar evento de acesso do tópico $topic", e)
         }
     }
-}
 
+    data class AccessEventPayload(
+        @JsonProperty("tagRead") val tagRead: String,
+        @JsonProperty("isGranted") val isGranted: Boolean,
+        @JsonProperty("denialReason") val denialReason: String?,
+    )
+}

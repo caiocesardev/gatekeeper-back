@@ -4,6 +4,9 @@ import com.webcrafters.gatekeeperback.api.cardholder.dto.CardholderAccessLogResp
 import com.webcrafters.gatekeeperback.domain.model.Role
 import com.webcrafters.gatekeeperback.domain.repository.AccessLogRepository
 import com.webcrafters.gatekeeperback.domain.repository.AppUserRepository
+import com.webcrafters.gatekeeperback.domain.repository.RfidCredentialRepository
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
@@ -14,9 +17,10 @@ import org.springframework.web.server.ResponseStatusException
 class CardholderService(
     private val appUserRepository: AppUserRepository,
     private val accessLogRepository: AccessLogRepository,
+    private val rfidCredentialRepository: RfidCredentialRepository,
 ) {
     @Transactional(readOnly = true)
-    fun listOwnAccessLogs(): List<CardholderAccessLogResponse> {
+    fun listOwnAccessLogs(pageable: Pageable): Page<CardholderAccessLogResponse> {
         val authentication = SecurityContextHolder.getContext().authentication
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuário não autenticado.")
 
@@ -26,12 +30,17 @@ class CardholderService(
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Usuário não encontrado.")
 
         if (appUser.role != Role.CARDHOLDER) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Acesso permitido apenas para cardholders.")
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Acesso permitido apenas para portadores (CARDHOLDER).")
         }
 
-        return accessLogRepository.findAll()
-            .filter { accessLog -> accessLog.tagRead.equals(appUser.email, ignoreCase = true) }
-            .sortedByDescending { it.timestamp }
+        val credentials = rfidCredentialRepository.findByAppUser(appUser)
+        if (credentials.isEmpty()) {
+            return Page.empty(pageable)
+        }
+
+        val tagReads = credentials.map { it.hexCode }
+
+        return accessLogRepository.findByTagReadIn(tagReads, pageable)
             .map { accessLog ->
                 CardholderAccessLogResponse(
                     id = accessLog.id,
@@ -45,4 +54,3 @@ class CardholderService(
             }
     }
 }
-

@@ -10,5 +10,7 @@ interface AccessPointRepository : JpaRepository<AccessPoint, Int> {
 
 	@Query("SELECT a FROM AccessPoint a WHERE a.deletedAt IS NULL")
 	fun findAllActive(): List<AccessPoint>
-}
 
+    @Query("SELECT a FROM AccessPoint a WHERE a.mqttIdentifier = ?1 AND a.deletedAt IS NULL")
+    fun findByMqttIdentifier(mqttIdentifier: String): AccessPoint?
+}
