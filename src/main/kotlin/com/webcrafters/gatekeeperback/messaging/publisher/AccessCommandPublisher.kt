@@ -1,11 +1,12 @@
 package com.webcrafters.gatekeeperback.messaging.publisher
 
-import com.webcrafters.gatekeeperback.core.config.MqttConfig
+import org.eclipse.paho.client.mqttv3.MqttClient
+import org.eclipse.paho.client.mqttv3.MqttException
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
 @Component
-class AccessCommandPublisher(private val mqttGateway: MqttConfig.MqttGateway) {
+class AccessCommandPublisher(private val mqttClient: MqttClient) {
 
     private val logger = LoggerFactory.getLogger(AccessCommandPublisher::class.java)
 
@@ -13,9 +14,9 @@ class AccessCommandPublisher(private val mqttGateway: MqttConfig.MqttGateway) {
         val topic = "gatekeeper/command/$mqttIdentifier"
         val payload = """{"command":"GRANT_ACCESS"}"""
         try {
-            mqttGateway.sendToMqtt(topic, payload)
+            mqttClient.publish(topic, payload.toByteArray(), 1, false)
             logger.info("✅ Comando GRANT_ACCESS enviado para o tópico: $topic")
-        } catch (e: Exception) {
+        } catch (e: MqttException) {
             logger.error("❌ Erro ao enviar comando MQTT para o tópico: $topic", e)
         }
     }
