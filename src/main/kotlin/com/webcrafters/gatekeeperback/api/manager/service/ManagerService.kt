@@ -13,6 +13,7 @@ import com.webcrafters.gatekeeperback.domain.repository.AccessLogRepository
 import com.webcrafters.gatekeeperback.domain.repository.AccessPointRepository
 import com.webcrafters.gatekeeperback.domain.repository.AppUserRepository
 import com.webcrafters.gatekeeperback.domain.repository.RfidCredentialRepository
+import com.webcrafters.gatekeeperback.domain.service.CacheSyncService // NOVO IMPORT
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.Pageable
@@ -27,6 +28,7 @@ class ManagerService(
     private val rfidCredentialRepository: RfidCredentialRepository,
     private val accessLogRepository: AccessLogRepository,
     private val appUserRepository: AppUserRepository,
+    private val cacheSyncService: CacheSyncService // 1. SERVIÇO INJETADO AQUI
 ) {
     @Transactional
     fun createAccessPoint(request: CreateAccessPointRequest): AccessPointResponse {
@@ -40,6 +42,9 @@ class ManagerService(
                 locationDescription = request.locationDescription,
             )
         )
+
+        // 2. AVISAR O HARDWARE: Sincroniza o cache do novo ponto de acesso recém-criado
+        cacheSyncService.synchronizePointCache(savedAccessPoint.mqttIdentifier)
 
         return savedAccessPoint.toResponse()
     }
@@ -79,6 +84,11 @@ class ManagerService(
             )
         )
 
+        // 3. AVISAR O HARDWARE: Como uma tag nova foi autorizada, atualiza o cache de todos os pontos ativos
+        accessPointRepository.findAllActive().forEach { point ->
+            cacheSyncService.synchronizePointCache(point.mqttIdentifier)
+        }
+
         return savedCredential.toResponse()
     }
 
@@ -87,7 +97,7 @@ class ManagerService(
         val page = accessLogRepository.findAll(pageable)
         return PageImpl(
             page.content
-                .filter { it.accessPoint.deletedAt == null }
+                .filter { it.accessPoint?.deletedAt == null }
                 .sortedByDescending { it.timestamp }
                 .map { it.toResponse() },
             pageable,
@@ -112,10 +122,9 @@ class ManagerService(
     private fun AccessLog.toResponse(): AccessLogResponse = AccessLogResponse(
         id = id,
         tagRead = tagRead,
-        accessPointId = accessPoint.id,
+        accessPointId = accessPoint?.id,
         timestamp = timestamp,
         isGranted = isGranted,
         denialReason = denialReason,
     )
 }
-

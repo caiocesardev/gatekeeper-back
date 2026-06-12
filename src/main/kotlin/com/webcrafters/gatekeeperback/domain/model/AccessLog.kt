@@ -21,7 +21,7 @@ class AccessLog(
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "access_point_id", nullable = false)
-    val accessPoint: AccessPoint,
+    val accessPoint: AccessPoint?,
 
     @Column(nullable = false)
     val timestamp: LocalDateTime,
