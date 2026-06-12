@@ -28,7 +28,7 @@ class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(
             ErrorResponse(
                 status = status.value(),
-                title = status.reasonPhrase ?: "Erro",
+                title = status.reasonPhrase,
                 message = reason,
             )
         )
@@ -62,7 +62,7 @@ class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception::class)
-    fun handleGenericException(ex: Exception): ResponseEntity<ErrorResponse> {
+    fun handleGenericException(): ResponseEntity<ErrorResponse> {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
             ErrorResponse(
                 status = HttpStatus.INTERNAL_SERVER_ERROR.value(),

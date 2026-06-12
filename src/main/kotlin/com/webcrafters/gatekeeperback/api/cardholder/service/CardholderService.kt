@@ -45,8 +45,8 @@ class CardholderService(
                 CardholderAccessLogResponse(
                     id = accessLog.id,
                     tagRead = accessLog.tagRead,
-                    accessPointId = accessLog.accessPoint.id,
-                    accessPointDescription = accessLog.accessPoint.locationDescription,
+                    accessPointId = accessLog.accessPoint?.id,
+                    accessPointDescription = accessLog.accessPoint?.locationDescription ?: "Unknown",
                     timestamp = accessLog.timestamp,
                     isGranted = accessLog.isGranted,
                     denialReason = accessLog.denialReason,
