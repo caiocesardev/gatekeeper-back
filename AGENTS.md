@@ -19,7 +19,6 @@
 - Java toolchain: Java 21 (configured in `build.gradle.kts`)
 - MQTT client library: `org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5` (dependency)
 - JWT library: `com.auth0:java-jwt:4.4.0` (dependency)
-- Note: `README.md` currently lists Kotlin 2.2.x — the actual build uses Kotlin 2.3.21. Prefer the versions above for generator decisions.
 
 ---
 
@@ -35,18 +34,18 @@ This project follows a simplified Domain-Driven Design (DDD) approach. You must 
 - `core/`: Global configurations (`SecurityConfig`, `MqttConfig`), global exception handlers, and security filters (`JwtAuthenticationFilter`, `RateLimiter`).
 - `domain/`: Centralized business rules containing ONLY `@Entity` models and Spring Data `Repositories`.
 - `messaging/`: Isolation for IoT communication. Contains MQTT subscribers (`AccessEventSubscriber`) and publishers.
-- `auth/`: Services and Controllers handling Login, OTP generation, token validation, and Emails.
+- `auth/`: Services and Controllers handling Login, **Password Reset (OTP)**, token validation, and Emails.
 - `api/`: REST Controllers, Services, and DTOs. It is strictly divided by RBAC profiles:
     - `api/admin/`: Accessible only by Sysadmins.
-    - `api/manager/`: Accessible only by Building Managers.
+    - `api/manager/`: Accessible only by Building Managers. Includes **Cardholder Management**.
     - `api/cardholder/`: Accessible only by End Users.
 
 ---
 
 ## 4. 🔒 Security & RBAC (Role-Based Access Control)
-- **Authentication:** All secure routes require a valid JWT passed in the `Authorization: Bearer <token>` header.
+- **Authentication:** All secure routes require a valid JWT passed in the `Authorization: Bearer <token>` header. The system also supports OTP for password reset.
 - **Roles:** Handled via the `Role` Enum: `ADMIN`, `MANAGER`, `CARDHOLDER`.
-- **Authorization:** `SecurityConfig` restricts endpoints by role (e.g., `/api/admin/**` requires `hasRole("ADMIN")`).
+- **Authorization:** `SecurityConfig` restricts endpoints by role (e.g., `/api/admin/**` requires `hasRole("ADMIN")`). The `ManagerController` uses `@PreAuthorize("hasRole('MANAGER')")`.
 - **Rate Limiting:** Auth routes (like `/api/auth/login`) are protected by a custom `RateLimiter` (e.g., max 5 attempts / 15 minutes).
 
 ---
@@ -68,3 +67,4 @@ When writing Kotlin code for this project, you MUST apply these standards:
 2. **Soft Deletes:** Entities have a `deletedAt` field. Use Soft Delete logic (e.g., `UPDATE ... SET deletedAt = NOW()`) instead of hard `DELETE` statements. Repositories must filter out records where `deletedAt IS NOT NULL`.
 3. **Pagination:** `GET` endpoints returning lists must always return a Spring `Page<T>` and accept `Pageable` parameters.
 4. **Constructor Injection:** Use Kotlin primary constructors for dependency injection (avoid `@Autowired` on fields).
+5. **Edge Sync:** When a user or credential status is changed (e.g., `isActive = false`), ALWAYS call `cacheSyncService.synchronizePointCache()` for relevant access points to ensure the hardware cache is updated.
