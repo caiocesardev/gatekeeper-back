@@ -1,73 +1,144 @@
 asyncapi: 2.6.0
 info:
-  title: Gatekeeper IoT - API de Mensageria (MQTT)
-  version: 1.0.0
-  description: Documentação da interface de comunicação assíncrona orientada a eventos.
+  title: Gatekeeper MQTT API
+  version: '1.0.0'
+  description: |
+    Esta API define a comunicação via MQTT entre o backend do Gatekeeper e os dispositivos de hardware (ESP32).
+    Ela cobre os fluxos de solicitação de acesso, respostas de validação e sincronização de cache de contingência.
+  contact:
+    name: WebCrafters Support
+    email: suporte@webcrafters.com
+
 servers:
-  mosquitto:
-    url: localhost:1883
+  production:
+    url: mqtt://<PROD_MQTT_HOST>:{port}
     protocol: mqtt
-    description: Eclipse Mosquitto MQTT Broker local (TCP)
+    description: Broker MQTT de Produção
+    variables:
+      port:
+        default: '1883'
+  development:
+    url: mqtt://localhost:1883
+    protocol: mqtt
+    description: Broker MQTT de Desenvolvimento Local
 
 channels:
   gatekeeper/access/request:
-    description: Tópico onde o hardware publica as tentativas de leitura de Tag RFID. O Back-end assina (subscribe) este tópico.
     subscribe:
-      summary: Receber Payload de Acesso
+      summary: "Recebe uma solicitação de acesso de um dispositivo."
+      description: |
+        O backend se inscreve neste tópico para receber eventos de leitura de tags RFID dos pontos de acesso.
+        Cada mensagem contém o código da tag e o identificador do dispositivo que a leu.
       operationId: receiveAccessRequest
       message:
-        $ref: '#/components/messages/AccessEventPayload'
+        $ref: '#/components/messages/AccessRequest'
+      bindings:
+        mqtt:
+          qos: 1
+          bindingVersion: 0.1.0
 
   gatekeeper/access/response/{mqttIdentifier}:
-    description: Tópico onde o Back-end publica o resultado da validação. O hardware correspondente assina este tópico.
     parameters:
       mqttIdentifier:
-        schema:
-          type: string
-        description: Identificador único do hardware (ex. GATE_01) para direcionar a resposta.
+        $ref: '#/components/parameters/mqttIdentifier'
     publish:
-      summary: Enviar Autorização/Bloqueio
-      operationId: sendValidationResponse
+      summary: "Envia o resultado da validação de acesso de volta para o dispositivo."
+      description: |
+        Após processar uma solicitação, o backend publica uma resposta neste tópico dinâmico.
+        O dispositivo correspondente ao `mqttIdentifier` deve estar inscrito para receber a ordem (abrir ou não a porta).
+      operationId: publishAccessResponse
       message:
-        $ref: '#/components/messages/AccessValidationResult'
+        $ref: '#/components/messages/AccessResponse'
+      bindings:
+        mqtt:
+          qos: 1
+          bindingVersion: 0.1.0
+
+  gatekeeper/access/sync/{mqttIdentifier}:
+    parameters:
+      mqttIdentifier:
+        $ref: '#/components/parameters/mqttIdentifier'
+    publish:
+      summary: "Envia o cache de tags autorizadas para um dispositivo específico."
+      description: |
+        O backend publica uma lista de tags RFID autorizadas neste tópico. Esta mensagem é *retida* (retained) pelo broker.
+        Isso permite que o dispositivo recupere as permissões de acesso local caso perca a conexão temporária com a rede (modo offline).
+      operationId: publishCacheSync
+      message:
+        $ref: '#/components/messages/CacheSync'
+      bindings:
+        mqtt:
+          qos: 1
+          retain: true
+          bindingVersion: 0.1.0
 
 components:
   messages:
-    AccessEventPayload:
-      name: AccessEventPayload
-      title: Payload de Evento de Acesso
+    AccessRequest:
+      name: AccessRequest
+      title: Solicitação de Acesso
+      summary: "Payload enviado pelo dispositivo ao ler uma tag RFID."
+      contentType: application/json
       payload:
-        type: object
-        required:
-          - tagRead
-          - mqttIdentifier
-          - timestamp
-        properties:
-          tagRead:
-            type: string
-            description: Código hexadecimal exclusivo da Tag RFID capturada.
-            example: 'A1B2C3D4'
-          mqttIdentifier:
-            type: string
-            description: Identificador exclusivo do ponto de acesso físico.
-            example: 'GATE_01'
-          timestamp:
-            type: string
-            format: date-time
-            description: Data e hora exata da tentativa de leitura na borda.
-            example: '2026-06-11T22:12:37'
+        $ref: "#/components/schemas/AccessRequestPayload"
+    AccessResponse:
+      name: AccessResponse
+      title: Resposta de Acesso
+      summary: "Payload enviado pelo backend para o dispositivo com o resultado da validação."
+      contentType: application/json
+      payload:
+        $ref: "#/components/schemas/AccessResponsePayload"
+    CacheSync:
+      name: CacheSync
+      title: Sincronização de Cache
+      summary: "Payload enviado pelo backend contendo a lista de tags permitidas em um ponto de acesso."
+      contentType: application/json
+      payload:
+        $ref: "#/components/schemas/CacheSyncPayload"
 
-    AccessValidationResult:
-      name: AccessValidationResult
-      title: Resultado da Validação
-      payload:
-        type: object
-        properties:
-          isGranted:
-            type: boolean
-            description: Define se o acesso foi liberado (true) ou bloqueado (false).
-            example: true
-          denialReason:
+  schemas:
+    AccessRequestPayload:
+      type: object
+      properties:
+        tagRead:
+          type: string
+          description: "O código hexadecimal da tag RFID que foi lida."
+          example: "A1B2C3D4"
+        mqttIdentifier:
+          type: string
+          description: "O identificador único do dispositivo que realizou a leitura."
+          example: "GATE_01_NORTH"
+      required:
+        - tagRead
+        - mqttIdentifier
+    AccessResponsePayload:
+      type: object
+      properties:
+        isGranted:
+          type: boolean
+          description: "Indica se o acesso foi concedido (true) ou negado (false)."
+          example: true
+        denialReason:
+          type: string
+          description: "Uma mensagem explicativa caso o acesso seja negado. Nulo se o acesso for concedido."
+          x-nullable: true
+          example: "Credencial expirada"
+      required:
+        - isGranted
+    CacheSyncPayload:
+      type: object
+      properties:
+        allowedTags:
+          type: array
+          description: "Lista de códigos hexadecimais de tags RFID que têm permissão de acesso neste ponto."
+          items:
             type: string
-            description: Motivo do bloqueio caso isGranted seja false.
-            example: 'TAG_UNREGISTERED'
+          example: ["A1B2C3D4", "F8E7D6C5", "E2A1B3C4"]
+      required:
+        - allowedTags
+
+  parameters:
+    mqttIdentifier:
+      description: "O identificador único do dispositivo MQTT (ex: GATE_01) para o qual a mensagem é destinada ou se originou."
+      schema:
+        type: string

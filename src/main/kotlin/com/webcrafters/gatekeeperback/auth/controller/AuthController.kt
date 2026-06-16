@@ -4,9 +4,13 @@ import com.webcrafters.gatekeeperback.auth.dto.AuthResponse
 import com.webcrafters.gatekeeperback.auth.dto.LoginRequest
 import com.webcrafters.gatekeeperback.auth.dto.SetupPasswordRequest
 import com.webcrafters.gatekeeperback.auth.dto.ValidateOtpRequest
+import com.webcrafters.gatekeeperback.core.exception.ErrorResponse
 import com.webcrafters.gatekeeperback.auth.service.AuthService
 import jakarta.validation.Valid
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.media.Content
+import io.swagger.v3.oas.annotations.media.ExampleObject
+import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -28,9 +32,40 @@ class AuthController(
     )
     @ApiResponses(value = [
         ApiResponse(responseCode = "200", description = "Login realizado com sucesso"),
-        ApiResponse(responseCode = "401", description = "Credenciais inválidas ou não autorizadas"),
-        ApiResponse(responseCode = "400", description = "Dados da requisição inválidos")
+        ApiResponse(
+            responseCode = "400",
+            description = "Dados da requisição inválidos",
+            content = [Content(
+                mediaType = "application/json",
+                schema = Schema(implementation = ErrorResponse::class),
+                examples = [ExampleObject(
+                    name = "Erro de Validação",
+                    value = """{"status": 400, "message": "O e-mail informado possui formato inválido.", "timestamp": "2023-10-27T10:00:00Z"}"""
+                )]
+            )]
+        ),
+        ApiResponse(
+            responseCode = "401",
+            description = "Credenciais inválidas ou não autorizadas",
+            content = [Content(
+                mediaType = "application/json",
+                schema = Schema(implementation = ErrorResponse::class),
+                examples = [ExampleObject(
+                    name = "Falha na Autenticação",
+                    value = """{"status": 401, "message": "E-mail ou senha incorretos.", "timestamp": "2023-10-27T10:00:00Z"}"""
+                )]
+            )]
+        ),
+        ApiResponse(
+            responseCode = "500",
+            description = "Erro interno no servidor",
+            content = [Content(
+                mediaType = "application/json",
+                schema = Schema(implementation = ErrorResponse::class)
+            )]
+        )
     ])
+    @Tag(name = "Público")
     @PostMapping("/login")
     fun login(@Valid @RequestBody request: LoginRequest): ResponseEntity<AuthResponse> =
         ResponseEntity.ok(authService.login(request))
@@ -41,9 +76,31 @@ class AuthController(
     )
     @ApiResponses(value = [
         ApiResponse(responseCode = "200", description = "Senha configurada com sucesso"),
-        ApiResponse(responseCode = "400", description = "Token de configuração inválido ou senha fora dos padrões"),
-        ApiResponse(responseCode = "404", description = "Usuário não encontrado")
+        ApiResponse(
+            responseCode = "400",
+            description = "Token inválido ou senha fora dos padrões",
+            content = [Content(
+                mediaType = "application/json",
+                schema = Schema(implementation = ErrorResponse::class),
+                examples = [ExampleObject(
+                    name = "Senha Fraca",
+                    value = """{"status": 400, "message": "A senha deve conter ao menos 8 caracteres, letras e números.", "timestamp": "2023-10-27T10:00:00Z"}"""
+                )]
+            )]
+        ),
+        ApiResponse(
+            responseCode = "404",
+            description = "Usuário não encontrado",
+            content = [Content(
+                mediaType = "application/json",
+                schema = Schema(implementation = ErrorResponse::class),
+                examples = [ExampleObject(
+                    value = """{"status": 404, "message": "Usuário não localizado para o token fornecido.", "timestamp": "2023-10-27T10:00:00Z"}"""
+                )]
+            )]
+        )
     ])
+    @Tag(name = "Público")
     @PostMapping("/setup-password")
     fun setupPassword(@Valid @RequestBody request: SetupPasswordRequest): ResponseEntity<AuthResponse> =
         ResponseEntity.ok(authService.setupPassword(request))
@@ -54,9 +111,30 @@ class AuthController(
     )
     @ApiResponses(value = [
         ApiResponse(responseCode = "200", description = "Código OTP validado com sucesso"),
-        ApiResponse(responseCode = "401", description = "Código OTP inválido ou expirado"),
-        ApiResponse(responseCode = "400", description = "Dados da requisição malformados")
+        ApiResponse(
+            responseCode = "400",
+            description = "Dados da requisição malformados",
+            content = [Content(
+                mediaType = "application/json",
+                schema = Schema(implementation = ErrorResponse::class),
+                examples = [ExampleObject(
+                    value = """{"status": 400, "message": "O código OTP deve ter 6 dígitos.", "timestamp": "2023-10-27T10:00:00Z"}"""
+                )]
+            )]
+        ),
+        ApiResponse(
+            responseCode = "401",
+            description = "Código OTP inválido ou expirado",
+            content = [Content(
+                mediaType = "application/json",
+                schema = Schema(implementation = ErrorResponse::class),
+                examples = [ExampleObject(
+                    value = """{"status": 401, "message": "Código expirado. Solicite um novo código.", "timestamp": "2023-10-27T10:00:00Z"}"""
+                )]
+            )]
+        )
     ])
+    @Tag(name = "Público")
     @PostMapping("/validate-otp")
     fun validateOtp(@Valid @RequestBody request: ValidateOtpRequest): ResponseEntity<AuthResponse> =
         ResponseEntity.ok(authService.validateOtp(request))
