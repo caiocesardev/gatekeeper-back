@@ -1,5 +1,6 @@
 package com.webcrafters.gatekeeperback.auth.service
 
+import com.webcrafters.gatekeeperback.domain.model.AppUser
 import com.webcrafters.gatekeeperback.domain.model.OneTimePassword
 import com.webcrafters.gatekeeperback.domain.repository.AppUserRepository
 import com.webcrafters.gatekeeperback.domain.repository.OneTimePasswordRepository
@@ -17,7 +18,11 @@ class OtpService(
     fun generateAndSendOtp(email: String): String {
         val appUser = appUserRepository.findByEmail(email)
             ?: throw IllegalArgumentException("Usuário com e-mail $email não encontrado.")
+        return generateAndSendOtp(appUser)
+    }
 
+    @Transactional
+    fun generateAndSendOtp(appUser: AppUser): String {
         // Invalidar OTPs anteriores
         otpRepository.findAll()
             .filter { it.appUser.id == appUser.id && !it.isUsed }
@@ -39,7 +44,7 @@ class OtpService(
         otpRepository.save(otp)
 
         // TODO: Enviar OTP por e-mail (integração com serviço de e-mail)
-        println("📧 OTP para $email: $code (expira em 10 minutos)")
+        println("📧 OTP para ${appUser.email}: $code (expira em 10 minutos)")
 
         return code
     }
@@ -59,5 +64,24 @@ class OtpService(
 
         return true
     }
-}
+    
+    @Transactional
+    fun validateOtp(appUser: AppUser, code: String): Boolean {
+        val otp = otpRepository.findByCodeAndIsUsedFalse(code)
+            ?: return false
+            
+        if (otp.appUser.id != appUser.id) {
+            return false
+        }
 
+        if (LocalDateTime.now() > otp.expiresAt) {
+            return false
+        }
+
+        otp.isUsed = true
+        otp.usedAt = LocalDateTime.now()
+        otpRepository.save(otp)
+
+        return true
+    }
+}

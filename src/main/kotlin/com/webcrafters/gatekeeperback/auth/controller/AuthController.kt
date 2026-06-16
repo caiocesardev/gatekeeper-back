@@ -1,9 +1,10 @@
 package com.webcrafters.gatekeeperback.auth.controller
 
 import com.webcrafters.gatekeeperback.auth.dto.AuthResponse
+import com.webcrafters.gatekeeperback.auth.dto.ForgotPasswordRequest
 import com.webcrafters.gatekeeperback.auth.dto.LoginRequest
+import com.webcrafters.gatekeeperback.auth.dto.ResetPasswordRequest
 import com.webcrafters.gatekeeperback.auth.dto.SetupPasswordRequest
-import com.webcrafters.gatekeeperback.auth.dto.ValidateOtpRequest
 import com.webcrafters.gatekeeperback.core.exception.ErrorResponse
 import com.webcrafters.gatekeeperback.auth.service.AuthService
 import jakarta.validation.Valid
@@ -106,53 +107,44 @@ class AuthController(
         ResponseEntity.ok(authService.setupPassword(request))
 
     @Operation(
-        summary = "Validar OTP (One-Time Password)",
-        description = "Valida o código temporário enviado ao usuário para verificação de identidade em duas etapas ou recuperação de conta."
+        summary = "Solicitar redefinição de senha",
+        description = "Gera um código OTP e o envia para o e-mail do usuário para iniciar o processo de redefinição de senha."
     )
     @ApiResponses(value = [
-        ApiResponse(responseCode = "200", description = "Código OTP validado com sucesso"),
+        ApiResponse(responseCode = "200", description = "Código OTP enviado com sucesso (ou e-mail inexistente ignorado silenciosamente)"),
         ApiResponse(
-            responseCode = "400",
-            description = "Dados da requisição malformados",
+            responseCode = "404",
+            description = "Usuário não encontrado",
             content = [Content(
                 mediaType = "application/json",
-                schema = Schema(implementation = ErrorResponse::class),
-                examples = [ExampleObject(
-                    value = """{"status": 400, "message": "O código OTP deve ter 6 dígitos.", "timestamp": "2023-10-27T10:00:00Z"}"""
-                )]
+                schema = Schema(implementation = ErrorResponse::class)
             )]
-        ),
+        )
+    ])
+    @Tag(name = "Público")
+    @PostMapping("/forgot-password")
+    fun forgotPassword(@Valid @RequestBody request: ForgotPasswordRequest): ResponseEntity<Void> {
+        authService.forgotPassword(request)
+        return ResponseEntity.ok().build()
+    }
+
+    @Operation(
+        summary = "Redefinir senha com OTP",
+        description = "Redefine a senha do usuário caso o código OTP informado seja válido."
+    )
+    @ApiResponses(value = [
+        ApiResponse(responseCode = "200", description = "Senha redefinida com sucesso"),
         ApiResponse(
             responseCode = "401",
             description = "Código OTP inválido ou expirado",
             content = [Content(
                 mediaType = "application/json",
-                schema = Schema(implementation = ErrorResponse::class),
-                examples = [ExampleObject(
-                    value = """{"status": 401, "message": "Código expirado. Solicite um novo código.", "timestamp": "2023-10-27T10:00:00Z"}"""
-                )]
+                schema = Schema(implementation = ErrorResponse::class)
             )]
         )
     ])
     @Tag(name = "Público")
-    @PostMapping("/validate-otp")
-    fun validateOtp(@Valid @RequestBody request: ValidateOtpRequest): ResponseEntity<AuthResponse> =
-        ResponseEntity.ok(authService.validateOtp(request))
-}
-
-private fun AuthService.validateOtp(request: ValidateOtpRequest): AuthResponse {
-    val requestClass = request.javaClass
-
-    val method = javaClass.methods.firstOrNull { candidate ->
-        candidate.name == "validateOtp" &&
-            candidate.parameterTypes.size == 1 &&
-            candidate.parameterTypes[0].isAssignableFrom(requestClass)
-    } ?: javaClass.methods.firstOrNull { candidate ->
-        candidate.name == "validateOtpAndSetPassword" &&
-            candidate.parameterTypes.size == 1 &&
-            candidate.parameterTypes[0].isAssignableFrom(requestClass)
-    } ?: throw IllegalStateException("Não foi possível localizar um método de validação de OTP no serviço de autenticação.")
-
-    @Suppress("UNCHECKED_CAST")
-    return method.invoke(this, request) as AuthResponse
+    @PostMapping("/reset-password")
+    fun resetPassword(@Valid @RequestBody request: ResetPasswordRequest): ResponseEntity<AuthResponse> =
+        ResponseEntity.ok(authService.resetPassword(request))
 }

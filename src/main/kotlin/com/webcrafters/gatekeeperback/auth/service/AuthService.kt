@@ -1,8 +1,6 @@
 package com.webcrafters.gatekeeperback.auth.service
 
-import com.webcrafters.gatekeeperback.auth.dto.AuthResponse
-import com.webcrafters.gatekeeperback.auth.dto.LoginRequest
-import com.webcrafters.gatekeeperback.auth.dto.SetupPasswordRequest
+import com.webcrafters.gatekeeperback.auth.dto.*
 import com.webcrafters.gatekeeperback.core.security.JwtService
 import com.webcrafters.gatekeeperback.domain.repository.AppUserRepository
 import org.springframework.http.HttpStatus
@@ -16,6 +14,7 @@ class AuthService(
     private val appUserRepository: AppUserRepository,
     private val passwordEncoder: PasswordEncoder,
     private val jwtService: JwtService,
+    private val otpService: OtpService,
 ) {
     @Transactional
     fun setupPassword(request: SetupPasswordRequest): AuthResponse {
@@ -49,5 +48,29 @@ class AuthService(
             token = jwtService.generateToken(appUser),
         )
     }
-}
 
+    @Transactional
+    fun forgotPassword(request: ForgotPasswordRequest) {
+        val appUser = appUserRepository.findByEmail(request.email)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Usuário não encontrado.")
+        otpService.generateAndSendOtp(appUser)
+    }
+
+    @Transactional
+    fun resetPassword(request: ResetPasswordRequest): AuthResponse {
+        val appUser = appUserRepository.findByEmail(request.email)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Usuário não encontrado.")
+
+        if (!otpService.validateOtp(appUser, request.code)) {
+            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Código OTP inválido ou expirado.")
+        }
+
+        appUser.password = passwordEncoder.encode(request.newPassword)
+        appUserRepository.save(appUser)
+
+        return AuthResponse(
+            message = "Senha redefinida com sucesso.",
+            token = jwtService.generateToken(appUser)
+        )
+    }
+}
