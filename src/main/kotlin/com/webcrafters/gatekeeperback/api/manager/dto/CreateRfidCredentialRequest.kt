@@ -2,15 +2,15 @@ package com.webcrafters.gatekeeperback.api.manager.dto
 
 import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.Positive
+import jakarta.validation.constraints.NotNull
 
-@Schema(description = "Objeto de requisição para criação de uma nova credencial RFID vinculada a um usuário.")
+@Schema(description = "Objeto de requisição para vincular uma nova credencial RFID a um usuário existente.")
 data class CreateRfidCredentialRequest(
+    @field:Schema(description = "Código hexadecimal único da tag ou cartão RFID.", example = "A1B2C3D4")
     @field:NotBlank(message = "O código hexadecimal da credencial é obrigatório.")
-    @field:Schema(description = "Código hexadecimal único da tag RFID.", example = "A1B2C3D4")
     val hexCode: String,
 
-    @field:Positive(message = "O identificador do usuário deve ser maior que zero.")
-    @field:Schema(description = "ID único do usuário proprietário da credencial.", example = "125")
+    @field:Schema(description = "ID do usuário (AppUser) ao qual esta credencial será associada.", example = "101")
+    @field:NotNull(message = "O ID do usuário é obrigatório.")
     val appUserId: Int,
 )

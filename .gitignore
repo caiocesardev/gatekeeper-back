@@ -1,40 +1,76 @@
-HELP.md
+# Created by https://www.toptal.com/developers/gitignore/api/gradle,kotlin
+# Edit at https://www.toptal.com/developers/gitignore?templates=gradle,kotlin
+
+### Dotenv ###
+.env
+.env.development
+.env.production
+
+### Gradle ###
 .gradle
 build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
 
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
+# Ignore Gradle GUI config
+gradle-app.setting
 
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-out/
-!**/src/main/**/out/
-!**/src/test/**/out/
+# Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
+!gradle-wrapper.jar
 
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
+# Avoid ignoring Gradle wrapper properties file (wrapper properties file are usually ignored)
+!gradle-wrapper.properties
 
-### VS Code ###
-.vscode/
+# Cache of project
+.gradletasknamecache
+
+# # Work around https://youtrack.jetbrains.com/issue/KT-12874
+# build/classes/kotlin/main/META-INF/
+
+# # Work around https://youtrack.jetbrains.com/issue/KT-12874
+# build/tmp/kapt3/classes/main/META-INF/
+
+# Ignore Gradle build information file
+.gradle-build-info.txt
 
 ### Kotlin ###
-.kotlin
+# Compiled class files
+*.class
+
+# Compiled Kotlin files
+*.kt.class
+
+# IDEA project files
+.idea/
+*.iml
+
+# Other
+/out
+
+# Log file
+*.log
+
+# Package Files #
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+.project
+.settings
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.classpath
+.loadpath
+.externalToolBuilders
+*~
+
+# End of https://www.toptal.com/developers/gitignore/api/java,gradle,kotlin
