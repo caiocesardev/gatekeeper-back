@@ -1,0 +1,14 @@
+# docker-compose.override.yml
+#
+# Configurações exclusivas para o ambiente de desenvolvimento local.
+# Este arquivo é carregado automaticamente pelo Docker Compose.
+#
+services:
+  database:
+    ports:
+      - "5432:5432" # Expõe a porta do PostgreSQL para o host
+
+  mqtt-broker:
+    ports:
+      - "1883:1883" # Expõe a porta do MQTT para o host
+      - "9001:9001" # Expõe a porta do MQTT over WebSockets

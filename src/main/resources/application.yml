@@ -5,9 +5,9 @@ spring:
     name: gatekeeper-backend
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/gatekeeper_db
-    username: admin
-    password: adminpassword
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/gatekeeper_db}
+    username: ${DB_USERNAME:admin}
+    password: ${DB_PASSWORD:adminpassword}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -19,10 +19,10 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
   mqtt:
-    broker-url: tcp://localhost:1883
-    client-id: spring-boot-backend
+    broker-url: ${MQTT_BROKER_URL:tcp://localhost:1883}
+    client-id: ${MQTT_CLIENT_ID:spring-boot-backend}
 
 app:
   jwt:
-    secret: GatekeeperBackJwtSecretKey_ChangeInProduction_32CharsMin
-    expiration-ms: 86400000
+    secret: ${JWT_SECRET:GatekeeperBackJwtSecretKey_ChangeInProduction_32CharsMin}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
