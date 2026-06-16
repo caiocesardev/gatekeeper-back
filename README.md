@@ -1,85 +1,91 @@
-# 🛡️ Gatekeeper IoT - Backend Service
+# 🛡️ Gatekeeper: Sistema Híbrido de Controle de Acesso IoT
 
-![Kotlin](https://img.shields.io/badge/Kotlin-2.3.21-purple?style=flat-square&logo=kotlin)
-![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.6-brightgreen?style=flat-square&logo=spring-boot)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18.4-blue?style=flat-square&logo=postgresql)
-![MQTT](https://img.shields.io/badge/MQTT-Mosquitto-orange?style=flat-square)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.3.21-blue.svg?logo=kotlin)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.6-brightgreen.svg?logo=spring)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18+-blue.svg?logo=postgresql)
+![MQTT](https://img.shields.io/badge/MQTT-Mosquitto-orange.svg?logo=eclipse-mosquitto)
+![Security](https://img.shields.io/badge/Security-JWT-blue.svg?logo=jsonwebtokens)
+![Tests](https://img.shields.io/badge/Tests-JUnit%205%20%7C%20MockK-red.svg?logo=junit5)
 
-> **Resumo Executivo**  
-> O Gatekeeper é um sistema inteligente de controle de acesso (IoT) projetado para gerenciar e auditar entradas em ambientes corporativos ou residenciais através de credenciais RFID. Este repositório contém o **Core Backend**, responsável por centralizar a lógica de negócios, segurança e comunicação de toda a plataforma.
-
-## 🏗️ Arquitetura Híbrida
-
-O grande diferencial arquitetural do Gatekeeper reside em sua topologia bifurcada, desenhada para atender a dois domínios distintos de forma otimizada:
-
-1.  **Interface Síncrona (RESTful API):** Através de rotas HTTP protegidas por JWT e baseadas em RBAC (Role-Based Access Control), o sistema serve dados em tempo real para o painel administrativo (Gestores e Admins) e para o aplicativo mobile (Portadores/Cardholders).
-2.  **Interface Assíncrona (Event-Driven Edge):** Utilizando mensageria MQTT, o servidor se comunica com os hardwares ESP32 (Access Points) nas portas. Essa abordagem garante resiliência de rede, baixíssima latência na abertura de portas e logs de acesso confiáveis mesmo em conexões instáveis.
+**Gatekeeper** é uma solução de nível empresarial (Enterprise-grade) projetada para orquestrar o controle de acesso físico através de dispositivos de borda (IoT). Nascido com resiliência em mente, ele suporta operação mesmo em cenários de degradação de conectividade.
 
 ---
 
-## 💻 Stack Tecnológica
+## 🏗️ 1. Visão Geral e Arquitetura Híbrida
 
-*   **Linguagem:** Kotlin 2.3+
-*   **Framework Principal:** Spring Boot 4.0+
-*   **Persistência:** Spring Data JPA / Hibernate
-*   **Banco de Dados:** PostgreSQL 18
-*   **Mensageria & IoT:** Eclipse Paho MQTT v3 Client + Eclipse Mosquitto Broker
-*   **Segurança:** Spring Security + JWT (`com.auth0:java-jwt`)
-*   **Automação & Build:** Gradle (Kotlin DSL)
+O projeto adota uma arquitetura de sistema distribuído com **topologia bifurcada**, oferecendo duas interfaces de comunicação altamente especializadas para diferentes atores do ecossistema:
 
----
-
-## 📖 Documentação das Interfaces
-
-Mantemos a documentação das nossas interfaces sempre atualizadas como código (Doc-as-Code).
-
-### 🌐 API REST (Swagger UI)
-A documentação interativa dos endpoints HTTP, schemas e esquemas de autenticação é gerada automaticamente pelo Springdoc OpenAPI.
-*   **Acesso Local:** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
-
-### 📨 Mensageria MQTT (AsyncAPI)
-O fluxo de eventos assíncronos, formatos de payload (JSON) para telemetria (envio de logs) e comandos (abertura de portas) estão catalogados utilizando o padrão AsyncAPI.
-* **Acesso Local:** [http://localhost:8080/asyncapi-ui.html](http://localhost:8080/asyncapi-ui.html)
+*   🌐 **Interface HTTP/REST (Síncrona):**
+    Destinada aos painéis de gestão, administradores de condomínios e usuários finais. Provê endpoints protegidos por *Role-Based Access Control (RBAC)* e **Spring Security com JWT**. Todo o tráfego gerencial, relatórios e gestão de perfis ocorre através dessa interface clássica e robusta.
+*   📡 **Interface MQTT (Assíncrona Orientada a Eventos):**
+    Uma via exclusiva para a comunicação de telemetria e comandos com os hardwares de borda (pontos de acesso, leitores RFID baseados em ESP32). Utiliza o protocolo leve **MQTT (via Eclipse Mosquitto)** para garantir *low-latency* nas validações de tags RFID, reduzir o *overhead* de cabeçalhos HTTP e operar por *publish/subscribe* em tópicos altamente isolados de segurança.
 
 ---
 
-## 🧪 Testes e Qualidade de Código
+## 🧠 2. Inteligência de Borda (Edge Computing) e Resiliência
 
-A qualidade é garantida através de uma suíte de testes robusta que cobre as regras de negócio críticas, especialmente os serviços de autenticação e fluxos assíncronos.
+Uma infraestrutura crítica de segurança física não pode depender de uma nuvem com 100% de disponibilidade. O Gatekeeper delega inteligência aos dispositivos através do fluxo de **Resiliência e Modo Offline**.
 
-*   **Framework de Testes:** JUnit 5
-*   **Mocking:** MockK (`io.mockk:mockk`)
-*   **Cobertura:** JaCoCo
+**Mecanismo de Sincronização e Fallback:**
+*   **Cache Proativo no Hardware:**
+    O Back-end, por meio do componente `CacheSyncService`, publica via MQTT uma lista atualizada de *Hashes de Credenciais Válidas* sempre que há uma alteração nos painéis gerenciais.
+*   **Modo Offline Seguro:**
+    Se o Ponto de Acesso (hardware) perder conexão com a rede Wi-Fi ou com o Broker MQTT, ele continua liberando catracas/portas validando as leituras de RFID localmente contra as chaves previamente salvas em sua memória Flash não volátil.
+*   **Reconciliação Assíncrona:**
+    Durante o *Modo Offline*, todo e qualquer log de acesso (concedido ou negado) é enfileirado localmente na borda. Quando a conexão é restabelecida, o dispositivo descarrega a fila reprimida (*burst*) através do MQTT. Os *Subscribers* no back-end consomem esses eventos retroativos e reconciliam a base de auditoria (`AccessLog`).
 
-### Relatório de Cobertura
-Para gerar e visualizar o relatório de cobertura de código do JaCoCo:
+---
+
+## 🛠️ 3. Stack Tecnológica
+
+Todo o core do produto foi modernizado para as mais recentes plataformas do mercado de desenvolvimento corporativo:
+
+| Tecnologia | Descrição / Uso |
+| :--- | :--- |
+| **Kotlin (2.3+)** | Linguagem principal adotando concisão, *null-safety* e classes *data/value*. |
+| **Spring Boot (4.0+)** | Framework base, provendo Injeção de Dependência, Data JPA/Hibernate e Web MVC. |
+| **PostgreSQL (18+)** | RDBMS para persistência de dados críticos, domínios e logs com alta confiabilidade. |
+| **Eclipse Mosquitto** | Message Broker *open-source* padrão da indústria para IoT (MQTT). |
+| **Spring Security & JWT** | Autenticação *stateless* e controle refinado de autorização baseada em Roles (Sysadmin, Manager, Cardholder). |
+| **ArduinoJson** | No firmware da borda (C++), os pacotes trafegados via MQTT utilizam esse parser robusto. |
+
+---
+
+## 📖 4. Documentação Doc-as-Code
+
+O mapeamento da plataforma, desde a sua infraestrutura até o contrato com os clientes, vive e evolui no mesmo ciclo de vida que a base de código (*Doc-as-Code*).
+
+*   **API REST (Swagger / OpenAPI 3):**
+    Contratos estritos, *schemas* de requisição/resposta, DTOs e requisitos de segurança. Acessível em tempo de desenvolvimento através de:
+    ➡️ `http://localhost:8080/swagger-ui.html`
+*   **Mensageria IoT (AsyncAPI):**
+    Documentação mapeando os canais, tópicos de subscrição (`gatekeeper/access/events`), padrões de payload de telemetria (C2D) e Comandos de Borda (D2C). Acessível em:
+    ➡️ `http://localhost:8080/asyncapi-ui.html`
+
+---
+
+## 🧪 5. Engenharia de Qualidade
+
+Código de segurança exige garantias de execução estritas. A cultura de qualidade do projeto é orientada à Testes Automatizados da pirâmide base:
+
+*   **Testes Unitários:** Operados via **JUnit 5**, verificando intensamente a camada de Domínio, `Services` e fluxos de `Security`.
+*   **MockK Nativo:** Empregamos `MockK` pela aderência orgânica ao ecossistema Kotlin. Utilizamos extensivamente a injeção nativa de dependências via **Construtor Primário** para provisionar Mocks, banindo injeções de campo por *Reflection* (`@Autowired`), o que previne erros mascarados e garante testes mais velozes.
+*   **Análise de Cobertura:** Com **JaCoCo**, emitimos relatórios em pipeline que validam a cobertura mínima, prevenindo a introdução de rotinas com pontas soltas.
+
+---
+
+## 🚀 6. Guia de Execução
+
+Seja para desenvolvimento iterativo ou deploy local, a inicialização da plataforma é direta e exige zero configuração manual no sistema operacional host.
+
+**Passo 1: Subir Infraestrutura de Apoio (PostgreSQL, Broker MQTT)**
+Na raiz do projeto, acione o manifesto Docker:
 ```bash
-# Executa os testes e gera o relatório HTML
-./gradlew test jacocoTestReport
-```
-*Após a execução, abra o arquivo `build/reports/jacoco/test/html/index.html` no seu navegador.*
-
----
-
-## 🚀 Como Executar Localmente
-
-Siga os passos abaixo para iniciar o ambiente de desenvolvimento completo na sua máquina.
-
-### 1. Subir a Infraestrutura (Banco & Broker)
-O projeto utiliza o Docker Compose para facilitar a orquestração do banco de dados e do servidor MQTT.
-
-```bash
-docker-compose up -d database mqtt-broker
+docker-compose up -d
 ```
 
-### 2. Configurar Propriedades
-O Spring Boot já está configurado para apontar para o `localhost` nas portas padrão expostas pelo Docker (`5432` para PostgreSQL e `1883` para MQTT). 
-
-### 3. Executar a Aplicação
-Compile e rode o servidor utilizando o wrapper do Gradle:
-
+**Passo 2: Iniciar o Application Server**
+Utilizando o Gradle Wrapper para baixar dependências e compilar a aplicação na JVM 21+:
 ```bash
 ./gradlew bootRun
 ```
-
-A API estará disponível na porta `8080` e conectada automaticamente ao broker MQTT.
